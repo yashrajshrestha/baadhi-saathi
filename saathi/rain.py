@@ -16,7 +16,8 @@ def _get(params: dict, timeout: float = 20) -> dict:
         return json.load(r)
 
 
-def outlook(lat: float, lon: float, days: int = 3, fetch=_get) -> dict:
+def outlook(lat: float, lon: float, days: int = 3, fetch=None) -> dict:
+    fetch = fetch or _get
     d = fetch({"latitude": lat, "longitude": lon, "daily": "precipitation_sum,precipitation_probability_max",
                "forecast_days": days, "timezone": "Asia/Kathmandu"})
     out = []

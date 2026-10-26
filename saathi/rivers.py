@@ -32,8 +32,9 @@ def _get(params: dict, timeout: float = 20) -> dict:
         return json.load(r)
 
 
-def channel_cell(lat: float, lon: float, fetch=_get) -> tuple[float, float, float]:
+def channel_cell(lat: float, lon: float, fetch=None) -> tuple[float, float, float]:
     """(lat, lon, today's discharge) of the main river cell near a point."""
+    fetch = fetch or _get   # looked up at call time, so tests can swap _get
     best = None
     for i in range(-SCAN, SCAN + 1):
         for j in range(-SCAN, SCAN + 1):
@@ -86,7 +87,8 @@ def risk_level(peak: float, typical: float, high: float) -> str:
     return "calm"
 
 
-def outlook(place: str, lat: float, lon: float, fetch=_get) -> Outlook:
+def outlook(place: str, lat: float, lon: float, fetch=None) -> Outlook:
+    fetch = fetch or _get
     clat, clon, _ = channel_cell(lat, lon, fetch)
     d = fetch({"latitude": clat, "longitude": clon, "daily": "river_discharge,river_discharge_max",
                "past_days": PAST_DAYS, "forecast_days": FORECAST_DAYS})
