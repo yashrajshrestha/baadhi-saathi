@@ -1,0 +1,11 @@
+Metadata-Version: 2.4
+Name: baadhi-saathi
+Version: 0.1.0
+Summary: Flood Friend: a Strands agent that turns river and rain forecasts into plain Nepali advice for one household.
+Requires-Python: >=3.12
+License-File: LICENSE
+Requires-Dist: strands-agents<2,>=1.62
+Requires-Dist: boto3>=1.43
+Provides-Extra: dev
+Requires-Dist: pytest>=8; extra == "dev"
+Dynamic: license-file
