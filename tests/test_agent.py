@@ -6,7 +6,7 @@ from saathi import agent, rivers
 
 def test_tools_answer_in_json_and_unknown_places_list_the_known_ones():
     tools = {t.tool_name: t for t in agent.make_tools()}
-    assert set(tools) == {"find_place", "river_outlook", "rain_outlook", "safe_places"}
+    assert set(tools) == {"find_place", "upstream_watch", "river_outlook", "rain_outlook", "safe_places"}
     found = json.loads(tools["find_place"](query="Arughat"))
     assert found["river"] == "Budhi Gandaki" and found["key"] == "arughat"
     unknown = json.loads(tools["find_place"](query="Pokhara"))
@@ -33,5 +33,7 @@ def test_dry_run_uses_the_tools_and_sets_the_headline(monkeypatch):
 
     monkeypatch.setattr(rivers, "_get", fetch)
     monkeypatch.setattr(agent.rain, "outlook", lambda lat, lon, days=3, fetch=None: {"next_days": [], "heaviest": None})
+    monkeypatch.setattr(agent.upstream, "ALERT_DIR", __import__("pathlib").Path("/nonexistent"))
     out = agent.dry_run("Narayanghat", "en")
     assert out["river"]["level"] == "warning" and out["headline"].startswith("WARNING")
+    assert out["upstream"]["alerts"] == [] and out["upstream"]["warning_signs"]

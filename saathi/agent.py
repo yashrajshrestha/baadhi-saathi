@@ -20,7 +20,7 @@ import sys
 
 from strands import Agent, tool
 
-from . import places, rain, rivers
+from . import places, rain, rivers, upstream
 
 MODEL_ID = os.environ.get("MODEL_ID", "amazon.nova-lite-v1:0")
 REGION = os.environ.get("BEDROCK_REGION", "us-east-1")
@@ -33,8 +33,12 @@ LEVEL_WORDS = {
 }
 
 SYSTEM = """You are Baadhi Saathi (बाढी साथी), a flood friend for one household in Nepal.
-Use the tools in this order: find_place, river_outlook, rain_outlook, safe_places. Then write advice.
+Use the tools in this order: find_place, upstream_watch, river_outlook, rain_outlook, safe_places. Then write advice.
 Rules:
+- If upstream_watch reports a live alert, that comes first and nothing else matters: say to go to high ground NOW,
+  name the safe place, and give the arrival window. Keep it to a few short lines.
+- Always include the warning signs from upstream_watch (river suddenly dropping, roar, muddy water, fast rise)
+  and that people should move up at once if they see one, without waiting for an SMS.
 - Write for someone who reads slowly. Short sentences. No jargon, no numbers bigger than needed.
 - Never make the risk sound smaller than the level the tools give. You may add caution, never remove it.
 - Give concrete steps for today: documents and medicines in one bag, phone charged, where the high ground is,
@@ -93,7 +97,29 @@ def make_tools() -> list:
         return json.dumps({"safe_places": p["safe_places"], "emergency": places.EMERGENCY,
                            "note": "Confirm with the ward office; routes may be cut when water rises."}, ensure_ascii=False)
 
-    return [find_place, river_outlook, rain_outlook, safe_places]
+    @tool
+    def upstream_watch(place_key: str, lang: str = "en") -> str:
+        """Sudden-flood check: live upstream gauge alerts (surge or river blockage) with arrival times, the known
+        landslide-dam and glacial-lake sources above this place, and the warning signs people can see themselves.
+
+        Args:
+            place_key: The key returned by find_place, e.g. "arughat".
+            lang: "ne" for Nepali warning signs, "en" for English.
+        """
+        if place_key not in places.PLACES:
+            return json.dumps({"error": "unknown place"})
+        return json.dumps(upstream.watch(place_key, lang if lang in ("ne", "en") else "en"), ensure_ascii=False)
+
+    return [find_place, upstream_watch, river_outlook, rain_outlook, safe_places]
+
+
+def worst(levels) -> str:
+    """The most severe of the levels given; None and unknown values are ignored."""
+    known = [l for l in levels if l in LEVELS]
+    return max(known, key=LEVELS.index) if known else "calm"
+
+
+LEVELS = rivers.LEVELS
 
 
 def level_line(level: str, lang: str) -> str:
@@ -119,9 +145,11 @@ def dry_run(place: str, lang: str) -> dict:
     p = places.find(place)
     if not p:
         return {"error": "unknown place", "known": places.listing()}
+    up = upstream.watch(p["key"], lang)
     river = rivers.summary(rivers.outlook(p["name"], p["lat"], p["lon"]))
-    return {"place": p["name"], "river": river, "rain": rain.outlook(p["lat"], p["lon"]),
-            "safe": p["safe_places"], "emergency": places.EMERGENCY, "headline": level_line(river["level"], lang)}
+    level = worst([river["level"], up["level"]])
+    return {"place": p["name"], "level": level, "upstream": up, "river": river, "rain": rain.outlook(p["lat"], p["lon"]),
+            "safe": p["safe_places"], "emergency": places.EMERGENCY, "headline": level_line(level, lang)}
 
 
 def advise(place: str, lang: str = "ne", sms: bool = False, agent: Agent | None = None) -> str:
@@ -129,8 +157,8 @@ def advise(place: str, lang: str = "ne", sms: bool = False, agent: Agent | None 
     ask = (f"Household in {place}. Language: {lang}. {'SMS mode.' if sms else ''} "
            "Check the river and rain, then give today's advice.")
     result = agent(ask)
-    # the level the tools computed, read back from the tool results in the conversation
-    level = "calm"
+    # the most severe level any tool computed, read back from the tool results in the conversation
+    seen = []
     for m in agent.messages:
         for c in m.get("content", []):
             tr = c.get("toolResult")
@@ -139,10 +167,10 @@ def advise(place: str, lang: str = "ne", sms: bool = False, agent: Agent | None 
                     txt = part.get("text", "")
                     if '"level"' in txt:
                         try:
-                            level = json.loads(txt).get("level", level)
+                            seen.append(json.loads(txt).get("level"))
                         except ValueError:
                             pass
-    return finish(str(result), level, lang)
+    return finish(str(result), worst(seen), lang)
 
 
 def main() -> None:

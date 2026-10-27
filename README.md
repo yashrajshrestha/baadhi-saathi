@@ -23,6 +23,27 @@ python -m saathi.agent "Chatara" --dry-run           # the numbers only, no mode
    simple multiples, written down in `saathi/rivers.py`, so a ward officer can read them.
 3. `rain_outlook` — three-day rain totals, with 60 mm and 120 mm per day as the heavy lines.
 4. `safe_places` — higher ground and shelters for the pilot place, plus 1149 (NEOC), 100, 102.
+5. `upstream_watch` — the sudden floods no forecast can see. Each pilot place lists its known
+   landslide-dam and glacial-lake sources upstream, and the warning signs anyone can see
+   (river suddenly dropping, a roar, muddy water, a fast rise). When an upstream gauge reports a
+   surge, the place goes straight to **danger** with an arrival window (distance ÷ 10–30 km/h).
+
+### Upstream gauges and AWS IoT
+
+A real gauge near a landslide dam or glacial lake would publish one small MQTT message to AWS IoT Core:
+
+```
+gauge ──MQTT saathi/surge/<station>──► AWS IoT Core ──IoT Rule──► Lambda ──► agent ──► SMS per ward
+{"station": "chumchet", "kind": "surge", "observed_at": "2026-10-11T04:00:00+05:45", "rise_m": 3.2}
+```
+
+The simulator sends the same message to a local folder, so the whole chain runs on a laptop:
+
+```
+python -m saathi.simulate surge chumchet --rise 3.2      # a surge passes the Chumchet gauge
+python -m saathi.agent "Arughat" --dry-run               # Arughat is now DANGER, arriving 06:00–10:00
+python -m saathi.simulate clear
+```
 
 Then Amazon Bedrock (Nova Lite) writes the advice: short sentences, today's steps, in the language asked.
 The code stamps its own level line on top of the model's words (`finish()`), so a soothing paragraph can
