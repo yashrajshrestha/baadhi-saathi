@@ -32,6 +32,12 @@ LEVEL_WORDS = {
     "danger":  {"en": "DANGER: very high flow forecast, move valuables and plan to leave", "ne": "खतरा: धेरै ठूलो बहावको पूर्वानुमान, सामान माथि सार्नुहोस् र जाने तयारी गर्नुहोस्"},
 }
 
+# When an upstream gauge has seen a surge or a blockage, the forecast wording is wrong: this is happening now.
+SURGE_WORDS = {
+    "en": "DANGER NOW: a flood surge is coming down the river. Go to high ground immediately",
+    "ne": "अहिले खतरा: नदीमा बाढी आउँदैछ। तुरुन्तै अग्लो ठाउँमा जानुहोस्",
+}
+
 SYSTEM = """You are Baadhi Saathi (बाढी साथी), a flood friend for one household in Nepal.
 Use the tools in this order: find_place, upstream_watch, river_outlook, rain_outlook, safe_places. Then write advice.
 Rules:
@@ -122,13 +128,15 @@ def worst(levels) -> str:
 LEVELS = rivers.LEVELS
 
 
-def level_line(level: str, lang: str) -> str:
+def level_line(level: str, lang: str, surge: bool = False) -> str:
+    if surge:
+        return SURGE_WORDS.get(lang, SURGE_WORDS["en"])
     return LEVEL_WORDS.get(level, LEVEL_WORDS["calm"]).get(lang, LEVEL_WORDS["calm"]["en"])
 
 
-def finish(model_text: str, level: str, lang: str) -> str:
+def finish(model_text: str, level: str, lang: str, surge: bool = False) -> str:
     """The code's level line always comes first; the model's words follow."""
-    head = level_line(level, lang)
+    head = level_line(level, lang, surge)
     body = model_text.strip()
     return head if not body else f"{head}\n\n{body}"
 
@@ -149,7 +157,8 @@ def dry_run(place: str, lang: str) -> dict:
     river = rivers.summary(rivers.outlook(p["name"], p["lat"], p["lon"]))
     level = worst([river["level"], up["level"]])
     return {"place": p["name"], "level": level, "upstream": up, "river": river, "rain": rain.outlook(p["lat"], p["lon"]),
-            "safe": p["safe_places"], "emergency": places.EMERGENCY, "headline": level_line(level, lang)}
+            "safe": p["safe_places"], "emergency": places.EMERGENCY,
+            "headline": level_line(level, lang, surge=bool(up["alerts"]))}
 
 
 def advise(place: str, lang: str = "ne", sms: bool = False, agent: Agent | None = None) -> str:
@@ -158,7 +167,7 @@ def advise(place: str, lang: str = "ne", sms: bool = False, agent: Agent | None 
            "Check the river and rain, then give today's advice.")
     result = agent(ask)
     # the most severe level any tool computed, read back from the tool results in the conversation
-    seen = []
+    seen, surge = [], False
     for m in agent.messages:
         for c in m.get("content", []):
             tr = c.get("toolResult")
@@ -167,10 +176,12 @@ def advise(place: str, lang: str = "ne", sms: bool = False, agent: Agent | None 
                     txt = part.get("text", "")
                     if '"level"' in txt:
                         try:
-                            seen.append(json.loads(txt).get("level"))
+                            d = json.loads(txt)
                         except ValueError:
-                            pass
-    return finish(str(result), worst(seen), lang)
+                            continue
+                        seen.append(d.get("level"))
+                        surge = surge or bool(d.get("alerts"))
+    return finish(str(result), worst(seen), lang, surge)
 
 
 def main() -> None:

@@ -19,6 +19,7 @@ def test_finish_puts_the_codes_level_first_in_both_languages():
     out = agent.finish("सबै ठीक छ, चिन्ता नगर्नुहोस्।", "danger", "ne")
     assert out.startswith("खतरा:") and out.endswith("नगर्नुहोस्।")
     assert agent.finish("", "watch", "en") == "WATCH: the river will run higher than usual"
+    assert agent.finish("", "danger", "ne", surge=True).startswith("अहिले खतरा")   # happening now, not a forecast
 
 
 def test_dry_run_uses_the_tools_and_sets_the_headline(monkeypatch):
