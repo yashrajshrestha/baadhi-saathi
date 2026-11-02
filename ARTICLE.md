@@ -154,7 +154,7 @@ river cell. A forecast for the wrong river looks just as convincing as one for t
 ```bash
 git clone https://github.com/yashrajshrestha/baadhi-saathi && cd baadhi-saathi
 python3 -m venv .venv && .venv/bin/pip install -e ".[dev,evals]"
-.venv/bin/pytest -q                                              # 35 tests, no AWS needed
+.venv/bin/pytest -q                                              # 36 tests, no AWS needed
 python -m saathi.agent "Chatara" --dry-run                       # the numbers, no model
 AWS_PROFILE=you python -m saathi.agent "Arughat" --lang ne --show-steps
 ```

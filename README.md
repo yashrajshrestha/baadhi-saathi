@@ -103,7 +103,7 @@ AWS_PROFILE=personal python -m evals.run          # 6 cases; results in evals/re
 
 ```
 python3 -m venv .venv && .venv/bin/pip install -e ".[dev,evals]"
-.venv/bin/pytest -q                      # 35 tests, no network, no AWS
+.venv/bin/pytest -q                      # 36 tests, no network, no AWS
 AWS_PROFILE=personal .venv/bin/python -m saathi.agent "Arughat" --lang ne
 ```
 
