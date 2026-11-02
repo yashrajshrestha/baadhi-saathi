@@ -33,8 +33,28 @@ def test_dry_run_uses_the_tools_and_sets_the_headline(monkeypatch):
         return {"latitude": params["latitude"], "longitude": params["longitude"], "daily": {"river_discharge": [100.0]}}
 
     monkeypatch.setattr(rivers, "_get", fetch)
-    monkeypatch.setattr(agent.rain, "outlook", lambda lat, lon, days=3, fetch=None: {"next_days": [], "heaviest": None})
+    monkeypatch.setattr(agent.rain, "outlook", lambda lat, lon, days=3, fetch=None, as_of=None: {"next_days": [], "heaviest": None})
     monkeypatch.setattr(agent.upstream, "ALERT_DIR", __import__("pathlib").Path("/nonexistent"))
     out = agent.dry_run("Narayanghat", "en")
     assert out["river"]["level"] == "warning" and out["headline"].startswith("WARNING")
     assert out["upstream"]["alerts"] == [] and out["upstream"]["warning_signs"]
+
+
+def test_finish_drops_repeated_paragraphs_and_hindi_words():
+    out = agent.finish("अगला दिनहरुमा पानी बढ्छ।\n\nअग्लो ठाउँमा जानुहोस्।\n\nअग्लो ठाउँमा जानुहोस्।", "danger", "ne")
+    assert out.count("अग्लो ठाउँमा जानुहोस्।") == 1 and "आउने दिनहरुमा" in out and "अगला" not in out
+
+
+def test_under_a_warning_the_code_says_where_to_go_when_and_who_to_call():
+    seen = {"level": "danger", "surge": True, "alerts": [{"arrives_between": ["21:00", "23:00"]}],
+            "safe_en": ["Arughat school building (upper floor)"], "safe_ne": ["आरुघाट विद्यालय भवन (माथिल्लो तला)"]}
+    ne = agent.action_block(seen, "ne")
+    assert "आरुघाट विद्यालय" in ne and "21:00" in ne and "1149" in ne
+    out = agent.finish("SMS 1/3: अग्लो ठाउँमा जानुहोस्।", "danger", "ne", surge=True, action=ne)
+    assert out.startswith("अहिले खतरा") and out.index("कहाँ जाने") < out.rindex("अग्लो ठाउँमा जानुहोस्।") and "SMS 1/3" not in out
+    assert agent.action_block({**seen, "level": "watch", "surge": False}, "en") == ""
+
+
+def test_sms_labels_are_removed_even_inside_a_line():
+    out = agent.finish("पानी बढ्यो। SMS 2/3: अग्लो ठाउँमा जानुहोस्।", "watch", "ne")
+    assert "SMS" not in out and "अग्लो ठाउँमा जानुहोस्।" in out

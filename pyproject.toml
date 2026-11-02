@@ -3,10 +3,11 @@ name = "baadhi-saathi"
 version = "0.1.0"
 description = "Flood Friend: a Strands agent that turns river and rain forecasts into plain Nepali advice for one household."
 requires-python = ">=3.12"
-dependencies = ["strands-agents>=1.62,<2", "boto3>=1.43"]
+dependencies = ["strands-agents>=1.63,<2", "boto3>=1.43"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
+evals = ["strands-agents-evals>=1.8,<2"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

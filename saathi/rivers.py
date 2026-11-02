@@ -16,6 +16,7 @@ import statistics
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
+from datetime import date, timedelta
 
 API = "https://flood-api.open-meteo.com/v1/flood"
 STEP = 0.05          # GloFAS grid spacing in degrees
@@ -87,11 +88,22 @@ def risk_level(peak: float, typical: float, high: float) -> str:
     return "calm"
 
 
-def outlook(place: str, lat: float, lon: float, fetch=None) -> Outlook:
+def window(as_of: str | None) -> dict:
+    """Request parameters for the past window plus the coming days. With `as_of` (YYYY-MM-DD) the same
+    window is taken from the record, so a past flood can be replayed: hindsight with the data on file
+    now, not the forecast that was issued that morning."""
+    if not as_of:
+        return {"past_days": PAST_DAYS, "forecast_days": FORECAST_DAYS}
+    day = date.fromisoformat(as_of)
+    return {"start_date": (day - timedelta(days=PAST_DAYS)).isoformat(),
+            "end_date": (day + timedelta(days=FORECAST_DAYS - 1)).isoformat()}
+
+
+def outlook(place: str, lat: float, lon: float, fetch=None, as_of: str | None = None) -> Outlook:
     fetch = fetch or _get
     clat, clon, _ = channel_cell(lat, lon, fetch)
     d = fetch({"latitude": clat, "longitude": clon, "daily": "river_discharge,river_discharge_max",
-               "past_days": PAST_DAYS, "forecast_days": FORECAST_DAYS})
+               **window(as_of)})
     days = d["daily"]["time"]
     q = [x if x is not None else 0.0 for x in d["daily"]["river_discharge"]]
     qmax = [x if x is not None else 0.0 for x in d["daily"].get("river_discharge_max") or q]
@@ -106,6 +118,8 @@ def outlook(place: str, lat: float, lon: float, fetch=None) -> Outlook:
     o.level = risk_level(o.peak, o.typical, o.high)
     if o.peak > 0 and o.typical > 0:
         o.notes.append(f"peak {o.peak:.0f} m3/s on {o.peak_day}, {o.peak / o.typical:.1f}x the recent typical flow")
+    if as_of:
+        o.notes.append(f"REPLAY as of {as_of}: recorded flows, not the forecast issued that day")
     return o
 
 

@@ -11,9 +11,10 @@ family in Arughat as "move the grain upstairs tonight". That last step is what t
 ## What it does
 
 ```
-python -m saathi.agent "Arughat" --lang ne          # advice in Nepali
-python -m saathi.agent "Narayanghat" --lang en --sms # three short messages
-python -m saathi.agent "Chatara" --dry-run           # the numbers only, no model, no AWS
+python -m saathi.agent "Arughat" --lang ne           # advice in Nepali
+python -m saathi.agent "Narayanghat" --lang en --sms  # three short messages
+python -m saathi.agent "Chatara" --dry-run            # the numbers only, no model, no AWS
+python -m saathi.push --no-send                       # today's SMS for every subscribed phone
 ```
 
 1. `find_place` — which river matters for this household (three pilot places for now).
@@ -46,8 +47,45 @@ python -m saathi.simulate clear
 ```
 
 Then Amazon Bedrock (Nova Lite) writes the advice: short sentences, today's steps, in the language asked.
-The code stamps its own level line on top of the model's words (`finish()`), so a soothing paragraph can
-never hide a danger. The model may add caution; it cannot remove it.
+
+## Safety lives in code, not in the prompt
+
+A prompt asks; code decides. Four layers, each from a Strands feature taught in the *Workshop to Ship*
+workshop, applied to a flood:
+
+| Layer | Strands feature | What it enforces |
+|---|---|---|
+| `FloodSafetyHandler` (`saathi/steering.py`) | steering handler (`steer_before_tool`, `steer_after_model`) | no tool before the place is known; warning signs fetched in the household's language, not translated; no answer until every check has run; a draft in the wrong script, with reassurance under a warning, without a named safe place, with a wrong emergency number, or without "go now" in a surge is sent back to be rewritten (at most twice) |
+| `ToolBudget` | hook (`BeforeToolCallEvent`) | a runaway tool loop is cut off: past 14 calls in a turn tools are refused, past 22 the run is cancelled |
+| `finish()` + `action_block()` | plain code after the loop | the level line is the code's, on top; under warning or danger, *where to go, when the water comes and who to call* are written by the code from the tools' data; if the model still fails the checks, or errors, its words are dropped and the household gets the code's message |
+| `--household` | `FileSessionManager` | remembers each household's place, language and last level, so tomorrow's message needs no setup and says how today compares |
+
+Why so strict: in testing, Nova Lite once named a **bridge** as a safe place during a surge, gave **112**
+(not a Nepal number), answered a Nepali household in English, and skipped the rain check. Every one of
+those is now caught by a rule in code, and there is a test for each.
+
+```
+python -m saathi.agent "Arughat" --lang ne --show-steps          # watch the tools and any steering
+python -m saathi.agent "Chatara" --household "Gita" --lang ne    # first visit
+python -m saathi.agent --household "Gita"                        # next day: no place, no language needed
+python -m saathi.agent "Chatara" --as-of 2026-07-17 --lang en    # replay a past day from recorded data
+```
+
+`--as-of` replays a past day with the river and rain **recorded since**, not the forecast issued that
+morning, so it shows what the rules would have said, with hindsight. On 17 July 2026, three days before the
+Koshi at Chatara peaked at about 6,000 m³/s (four times its usual flow), the level was **WARNING**.
+
+## Evals
+
+`evals/run.py` uses **strands-agents-evals**. Each case's expected level is computed by the code from the
+same data (no model), then two evaluators score the agent's message: `SafetyChecks` (deterministic: level
+line, required checks ran, no reassurance under a warning, a real safe place named, only Nepal's emergency
+numbers, the household's language, the arrival window in a surge) and an `OutputEvaluator` judge (Amazon
+Nova Pro: would this household know what to do, and is anything claimed that the data cannot support?).
+
+```
+AWS_PROFILE=personal python -m evals.run          # 6 cases; results in evals/results-<model>.md
+```
 
 ## Honest limits
 
@@ -55,13 +93,17 @@ never hide a danger. The model may add caution; it cannot remove it.
   landslide dam breaking or a glacial lake bursting; the 11 October flood would not have shown up here.
   For those, the agent's job is what to do once the official alert comes.
 - Safe places are examples to be confirmed with the ward office. Routes can be cut when water rises.
+- Three pilot places. The river levels compare the coming peak with the river's own last 90 days; they
+  are not DHM's warning and danger lines (DHM's gauges are not reachable from outside Nepal).
+- Nova Lite's Nepali is understandable but not polished; it sometimes slips into Hindi words, which the
+  code replaces where it knows them. The emergency lines are always the code's own Nepali.
 - It supports DHM and ward alerts. It never replaces them.
 
 ## Run it
 
 ```
-python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
-.venv/bin/pytest -q                      # no network, no AWS
+python3 -m venv .venv && .venv/bin/pip install -e ".[dev,evals]"
+.venv/bin/pytest -q                      # 35 tests, no network, no AWS
 AWS_PROFILE=personal .venv/bin/python -m saathi.agent "Arughat" --lang ne
 ```
 

@@ -38,3 +38,22 @@ def test_outlook_builds_thresholds_from_the_past_and_finds_the_peak():
     assert (o.peak_day, o.peak, o.level) == ("d92", 400.0, "danger")   # 400 >= max(375, 300)
     s = rivers.summary(o)
     assert s["level"] == "danger" and len(s["next_days"]) == 7 and "landslide" in s["limits"]
+
+
+def test_a_replay_asks_for_the_same_window_from_the_record():
+    assert rivers.window(None) == {"past_days": rivers.PAST_DAYS, "forecast_days": rivers.FORECAST_DAYS}
+    assert rivers.window("2026-07-17") == {"start_date": "2026-04-18", "end_date": "2026-07-23"}
+    seen = {}
+
+    def fetch(params):
+        seen.update(params)
+        n = rivers.PAST_DAYS + rivers.FORECAST_DAYS
+        if "start_date" in params:
+            return {"latitude": 27.7, "longitude": 84.43,
+                    "daily": {"time": [f"d{i}" for i in range(n)], "river_discharge": [100.0] * n,
+                              "river_discharge_max": [100.0] * n}}
+        return {"latitude": 27.7, "longitude": 84.43, "daily": {"river_discharge": [100.0]}}
+
+    o = rivers.outlook("Test", 27.7, 84.43, fetch=fetch, as_of="2026-07-17")
+    assert seen["start_date"] == "2026-04-18" and "past_days" not in seen
+    assert any("REPLAY as of 2026-07-17" in n for n in o.notes)

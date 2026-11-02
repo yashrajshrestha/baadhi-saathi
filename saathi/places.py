@@ -6,11 +6,16 @@ Emergency numbers: 1149 is Nepal's National Emergency Operation Center; 100 poli
 """
 from __future__ import annotations
 
+import re
+
 PLACES = {
     "arughat": {
         "name": "Arughat, Gorkha", "name_ne": "आरुघाट, गोरखा", "lat": 28.04, "lon": 84.82,
         "river": "Budhi Gandaki", "river_ne": "बुढी गण्डकी",
         "safe_places": ["Higher ground above the bazaar towards the health post", "Arughat school building (upper floor)"],
+        "safe_places_ne": ["बजारभन्दा माथि स्वास्थ्य चौकीतिरको अग्लो ठाउँ", "आरुघाट विद्यालय भवन (माथिल्लो तला)"],
+        # Words that name a safe place; advice under a warning must contain one, so "go somewhere high" is not enough.
+        "landmarks": ["health post", "school", "स्वास्थ्य चौकी", "विद्यालय"],
         "context": "Budhi Gandaki flash flood on 11 Oct 2026 from a landslide-dam breach upstream; bridges and homes lost.",
         # Upstream sources of sudden floods that no rain or river forecast can see. Distances are
         # approximate river kilometres, to be checked with DHM before any real use.
@@ -23,6 +28,8 @@ PLACES = {
         "name": "Narayanghat, Chitwan", "name_ne": "नारायणघाट, चितवन", "lat": 27.70, "lon": 84.43,
         "river": "Narayani", "river_ne": "नारायणी",
         "safe_places": ["Bharatpur hospital area (away from the river bank)", "Ward office and schools on the east side of the highway"],
+        "safe_places_ne": ["भरतपुर अस्पताल क्षेत्र (नदी किनारबाट टाढा)", "राजमार्गको पूर्वपट्टिको वडा कार्यालय र विद्यालयहरू"],
+        "landmarks": ["hospital", "ward office", "school", "अस्पताल", "वडा कार्यालय", "विद्यालय"],
         "context": "Low-lying settlements by the Narayani flood in most monsoons; the river rises over hours, not minutes.",
         "upstream": [
             {"id": "budhi-gandaki", "name": "Budhi Gandaki (landslide dams, glacial lakes), via Trishuli", "kind": "landslide_dam", "km": 140},
@@ -33,6 +40,8 @@ PLACES = {
         "name": "Chatara, Sunsari", "name_ne": "चतरा, सुनसरी", "lat": 26.87, "lon": 87.16,
         "river": "Koshi", "river_ne": "कोशी",
         "safe_places": ["Embankment road towards Barahakshetra (higher ground)", "Chatara school and temple grounds above the bank"],
+        "safe_places_ne": ["वराहक्षेत्रतर्फको तटबन्ध सडक (अग्लो ठाउँ)", "किनारभन्दा माथिको चतरा विद्यालय र मन्दिर परिसर"],
+        "landmarks": ["embankment", "barahakshetra", "school", "temple", "तटबन्ध", "वराहक्षेत्र", "विद्यालय", "मन्दिर"],
         "context": "Koshi barrage area; embankment breaches in 2008 displaced tens of thousands.",
         "upstream": [
             {"id": "bhote-koshi", "name": "Bhote Koshi / Sun Koshi from Tibet (glacial lakes)", "kind": "glacial_lake", "km": 250},
@@ -65,9 +74,12 @@ EMERGENCY = {"NEOC (disaster)": "1149", "Police": "100", "Ambulance": "102"}
 
 
 def find(query: str) -> dict | None:
-    q = query.strip().lower()
+    """A pilot place by key or name, in either script; tolerant of "(river)" suffixes and extra words, because
+    a model copies names from listing() and once looped twelve times on "Chatara, Sunsari (Koshi)"."""
+    q = re.sub(r"\(.*?\)", "", query).strip().strip(",. ").lower()
     for key, p in PLACES.items():
-        if q in (key, p["name"].lower(), p["name_ne"]) or q in p["name"].lower():
+        town, town_ne = p["name"].split(",")[0].lower(), p["name_ne"].split(",")[0]
+        if q in (key, p["name"].lower(), p["name_ne"]) or (q and q in p["name"].lower()) or town in q or town_ne in q:
             return {"key": key, **p}
     return None
 
