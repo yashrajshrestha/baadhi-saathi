@@ -1,5 +1,0 @@
-strands-agents<2,>=1.62
-boto3>=1.43
-
-[dev]
-pytest>=8
