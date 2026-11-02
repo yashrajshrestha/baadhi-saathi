@@ -16,9 +16,11 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 
 from strands import Agent, tool
+from strands.hooks import AfterToolCallEvent, BeforeToolCallEvent, HookProvider, HookRegistry
 
 from . import places, rain, rivers, upstream
 
@@ -38,6 +40,11 @@ SURGE_WORDS = {
     "ne": "अहिले खतरा: नदीमा बाढी आउँदैछ। तुरुन्तै अग्लो ठाउँमा जानुहोस्",
 }
 
+HINDI_TO_NEPALI = {
+    "आपका": "तपाईंको", "आपकी": "तपाईंको", "आपके": "तपाईंका", "आपको": "तपाईंलाई", "आप ": "तपाईं ",
+    "सिर्फ़": "मात्र", "सिर्फ": "मात्र", "औषधियाँ": "औषधिहरू", "बैग": "झोला",
+}
+
 SYSTEM = """You are Baadhi Saathi (बाढी साथी), a flood friend for one household in Nepal.
 Use the tools in this order: find_place, upstream_watch, river_outlook, rain_outlook, safe_places. Then write advice.
 Rules:
@@ -53,7 +60,33 @@ Rules:
   so people must still follow DHM and ward office alerts.
 - Language: write in the language asked for (ne = Nepali in Devanagari, en = English). In SMS mode, at most
   3 messages of 160 characters each.
+- For Nepali, use Nepali forms, not Hindi: "तपाईंको" not "आपका", "सुझाव" not "सलाह", "हुनुहुन्छ" not "हैं".
 """
+
+
+class StepPrinter(HookProvider):
+    """Prints each tool call to stderr so a viewer can watch the agent work."""
+
+    def register_hooks(self, registry: HookRegistry) -> None:
+        registry.add_callback(BeforeToolCallEvent, self.before)
+        registry.add_callback(AfterToolCallEvent, self.after)
+
+    def before(self, event: BeforeToolCallEvent) -> None:
+        args = json.dumps(event.tool_use.get("input", {}), ensure_ascii=False)
+        print(f"  -> {event.tool_use['name']}({args})", file=sys.stderr, flush=True)
+
+    def after(self, event: AfterToolCallEvent) -> None:
+        text = "".join(p.get("text", "") for p in event.result.get("content", []))
+        note = ""
+        try:
+            d = json.loads(text)
+            if d.get("level"):
+                note = f" level={d['level']}"
+            if d.get("alerts"):
+                note += f" alerts={len(d['alerts'])}"
+        except ValueError:
+            pass
+        print(f"  <- {event.tool_use['name']} done{note}", file=sys.stderr, flush=True)
 
 
 def make_tools() -> list:
@@ -137,15 +170,23 @@ def level_line(level: str, lang: str, surge: bool = False) -> str:
 def finish(model_text: str, level: str, lang: str, surge: bool = False) -> str:
     """The code's level line always comes first; the model's words follow."""
     head = level_line(level, lang, surge)
-    body = model_text.strip()
+    # Nova sometimes emits its scratchpad in <thinking> tags; a household should never see it.
+    body = re.sub(r"<thinking>.*?</thinking>", "", model_text, flags=re.DOTALL)
+    body = re.sub(r"</?[A-Za-z_]+>", "", body)  # stray <message> style tags Nova sometimes wraps output in
+    body = body.replace("**", "").strip()  # markdown bold means nothing on a phone screen
+    if lang == "ne":
+        # Nova Lite drifts into Hindi pronouns about half the time; enforce Nepali in code, like the level.
+        for hindi, nepali in HINDI_TO_NEPALI.items():
+            body = body.replace(hindi, nepali)
     return head if not body else f"{head}\n\n{body}"
 
 
-def build_agent(model=None) -> Agent:
+def build_agent(model=None, show_steps: bool = False) -> Agent:
     if model is None:
         from strands.models import BedrockModel
         model = BedrockModel(model_id=MODEL_ID, region_name=REGION, temperature=0.2, max_tokens=600)
-    return Agent(model=model, tools=make_tools(), system_prompt=SYSTEM, callback_handler=None)
+    hooks = [StepPrinter()] if show_steps else []
+    return Agent(model=model, tools=make_tools(), system_prompt=SYSTEM, callback_handler=None, hooks=hooks)
 
 
 def dry_run(place: str, lang: str) -> dict:
@@ -161,9 +202,12 @@ def dry_run(place: str, lang: str) -> dict:
             "headline": level_line(level, lang, surge=bool(up["alerts"]))}
 
 
-def advise(place: str, lang: str = "ne", sms: bool = False, agent: Agent | None = None) -> str:
-    agent = agent or build_agent()
-    ask = (f"Household in {place}. Language: {lang}. {'SMS mode.' if sms else ''} "
+def advise(place: str, lang: str = "ne", sms: bool = False, agent: Agent | None = None,
+           show_steps: bool = False) -> str:
+    agent = agent or build_agent(show_steps=show_steps)
+    sms_rule = ("SMS mode: three short messages, no labels like 'SMS 1/3'. No dates, no m3/s, no coordinates; "
+                "say 'normal', 'higher than usual', 'very high' instead. " if sms else "")
+    ask = (f"Household in {place}. Language: {lang}. {sms_rule}"
            "Check the river and rain, then give today's advice.")
     result = agent(ask)
     # the most severe level any tool computed, read back from the tool results in the conversation
@@ -190,11 +234,12 @@ def main() -> None:
     ap.add_argument("--lang", default="ne", choices=["ne", "en"])
     ap.add_argument("--sms", action="store_true")
     ap.add_argument("--dry-run", action="store_true", help="tool outputs only, no model, no AWS")
+    ap.add_argument("--show-steps", action="store_true", help="print each tool call to stderr as it happens")
     a = ap.parse_args()
     if a.dry_run:
         print(json.dumps(dry_run(a.place, a.lang), ensure_ascii=False, indent=2))
         return
-    print(advise(a.place, a.lang, a.sms))
+    print(advise(a.place, a.lang, a.sms, show_steps=a.show_steps))
 
 
 if __name__ == "__main__":
