@@ -11,6 +11,9 @@ import re
 PLACES = {
     "arughat": {
         "name": "Arughat, Gorkha", "name_ne": "आरुघाट, गोरखा", "lat": 28.04, "lon": 84.82,
+        # The GloFAS cell on the river itself, checked on a map of the grid. The automatic scan picked a
+        # bigger river 20 km away here, so every pilot place pins its cell.
+        "river_cell": (28.025, 84.775),
         "river": "Budhi Gandaki", "river_ne": "बुढी गण्डकी",
         "safe_places": ["Higher ground above the bazaar towards the health post", "Arughat school building (upper floor)"],
         "safe_places_ne": ["बजारभन्दा माथि स्वास्थ्य चौकीतिरको अग्लो ठाउँ", "आरुघाट विद्यालय भवन (माथिल्लो तला)"],
@@ -26,6 +29,7 @@ PLACES = {
     },
     "narayanghat": {
         "name": "Narayanghat, Chitwan", "name_ne": "नारायणघाट, चितवन", "lat": 27.70, "lon": 84.43,
+        "river_cell": (27.675, 84.275),
         "river": "Narayani", "river_ne": "नारायणी",
         "safe_places": ["Bharatpur hospital area (away from the river bank)", "Ward office and schools on the east side of the highway"],
         "safe_places_ne": ["भरतपुर अस्पताल क्षेत्र (नदी किनारबाट टाढा)", "राजमार्गको पूर्वपट्टिको वडा कार्यालय र विद्यालयहरू"],
@@ -38,6 +42,7 @@ PLACES = {
     },
     "chatara": {
         "name": "Chatara, Sunsari", "name_ne": "चतरा, सुनसरी", "lat": 26.87, "lon": 87.16,
+        "river_cell": (26.725, 87.025),
         "river": "Koshi", "river_ne": "कोशी",
         "safe_places": ["Embankment road towards Barahakshetra (higher ground)", "Chatara school and temple grounds above the bank"],
         "safe_places_ne": ["वराहक्षेत्रतर्फको तटबन्ध सडक (अग्लो ठाउँ)", "किनारभन्दा माथिको चतरा विद्यालय र मन्दिर परिसर"],

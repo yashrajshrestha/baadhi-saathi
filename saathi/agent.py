@@ -154,7 +154,9 @@ def make_tools() -> list:
             lat: Latitude of the household.
             lon: Longitude of the household.
         """
-        return json.dumps(rivers.summary(rivers.outlook(place, lat, lon, as_of=as_of())), ensure_ascii=False)
+        p = places.find(place)
+        o = rivers.outlook(place, lat, lon, as_of=as_of(), cell=p.get("river_cell") if p else None)
+        return json.dumps(rivers.summary(o), ensure_ascii=False)
 
     @tool
     def rain_outlook(lat: float, lon: float) -> str:
@@ -164,7 +166,11 @@ def make_tools() -> list:
             lat: Latitude.
             lon: Longitude.
         """
-        return json.dumps(rain.outlook(lat, lon, as_of=as_of()), ensure_ascii=False)
+        try:
+            return json.dumps(rain.outlook(lat, lon, as_of=as_of()), ensure_ascii=False)
+        except Exception as e:   # rain is secondary to the river and upstream checks; say so and carry on
+            return json.dumps({"unavailable": True, "reason": f"rain data could not be fetched ({type(e).__name__})",
+                               "next_days": [], "note": "Say that rain data is unavailable today."})
 
     @tool
     def safe_places(place_key: str) -> str:
@@ -266,7 +272,7 @@ def dry_run(place: str, lang: str) -> dict:
     if not p:
         return {"error": "unknown place", "known": places.listing()}
     up = upstream.watch(p["key"], lang)
-    river = rivers.summary(rivers.outlook(p["name"], p["lat"], p["lon"], as_of=as_of()))
+    river = rivers.summary(rivers.outlook(p["name"], p["lat"], p["lon"], as_of=as_of(), cell=p.get("river_cell")))
     level = worst([river["level"], up["level"]])
     return {"place": p["name"], "level": level, "upstream": up, "river": river,
             "rain": rain.outlook(p["lat"], p["lon"], as_of=as_of()),
@@ -314,7 +320,7 @@ def code_picture(place: str, lang: str) -> dict:
     """The same picture steering builds, computed by the code alone (no model)."""
     p = places.find(place)
     up = upstream.watch(p["key"], lang)
-    river = rivers.summary(rivers.outlook(p["name"], p["lat"], p["lon"], as_of=as_of()))
+    river = rivers.summary(rivers.outlook(p["name"], p["lat"], p["lon"], as_of=as_of(), cell=p.get("river_cell")))
     return {"ok": set(REQUIRED), "level": "danger" if up["alerts"] else river["level"], "surge": bool(up["alerts"]),
             "alerts": up["alerts"], "safe": p["safe_places"] + p.get("safe_places_ne", []),
             "safe_en": p["safe_places"], "safe_ne": p.get("safe_places_ne", []), "landmarks": p.get("landmarks", [])}

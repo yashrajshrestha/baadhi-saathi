@@ -43,7 +43,7 @@ OUT_DIR = Path(__file__).resolve().parent
 CASES = [
     {"name": "today-narayanghat-en", "place": "Narayanghat", "lang": "en"},
     {"name": "replay-2026-07-17-chatara-en", "place": "Chatara", "lang": "en", "as_of": "2026-07-17"},
-    {"name": "replay-2026-07-16-arughat-ne", "place": "Arughat", "lang": "ne", "as_of": "2026-07-16"},
+    {"name": "replay-2026-07-11-arughat-ne", "place": "Arughat", "lang": "ne", "as_of": "2026-07-11"},
     {"name": "surge-arughat-ne", "place": "Arughat", "lang": "ne", "surge": "chumchet"},
     {"name": "surge-arughat-en-sms", "place": "Arughat", "lang": "en", "surge": "chumchet", "sms": True},
     {"name": "remembered-household-ne", "place": "Chatara", "lang": "ne", "as_of": "2026-07-17", "memory": True},

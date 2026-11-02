@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import date, timedelta
@@ -12,11 +14,17 @@ HEAVY_MM = 60.0       # a day at or above this is "heavy" for Nepal's hills (DHM
 VERY_HEAVY_MM = 120.0
 
 
-def _get(params: dict, timeout: float = 20) -> dict:
+def _get(params: dict, timeout: float = 20, tries: int = 3) -> dict:
     api = ARCHIVE_API if "start_date" in params else API
     url = api + "?" + urllib.parse.urlencode(params)
-    with urllib.request.urlopen(url, timeout=timeout) as r:
-        return json.load(r)
+    for attempt in range(tries):
+        try:
+            with urllib.request.urlopen(url, timeout=timeout) as r:
+                return json.load(r)
+        except urllib.error.HTTPError as e:   # the free API answers 429/503 when busy; wait and try again
+            if e.code not in (429, 502, 503) or attempt == tries - 1:
+                raise
+            time.sleep(2 * (attempt + 1))
 
 
 def outlook(lat: float, lon: float, days: int = 3, fetch=None, as_of: str | None = None) -> dict:

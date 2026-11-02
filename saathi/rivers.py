@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import json
 import statistics
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
@@ -27,10 +29,16 @@ FORECAST_DAYS = 7
 LEVELS = ("calm", "watch", "warning", "danger")
 
 
-def _get(params: dict, timeout: float = 20) -> dict:
+def _get(params: dict, timeout: float = 20, tries: int = 3) -> dict:
     url = API + "?" + urllib.parse.urlencode(params)
-    with urllib.request.urlopen(url, timeout=timeout) as r:
-        return json.load(r)
+    for attempt in range(tries):
+        try:
+            with urllib.request.urlopen(url, timeout=timeout) as r:
+                return json.load(r)
+        except urllib.error.HTTPError as e:   # the free API answers 429/503 when busy; wait and try again
+            if e.code not in (429, 502, 503) or attempt == tries - 1:
+                raise
+            time.sleep(2 * (attempt + 1))
 
 
 def channel_cell(lat: float, lon: float, fetch=None) -> tuple[float, float, float]:
@@ -99,9 +107,11 @@ def window(as_of: str | None) -> dict:
             "end_date": (day + timedelta(days=FORECAST_DAYS - 1)).isoformat()}
 
 
-def outlook(place: str, lat: float, lon: float, fetch=None, as_of: str | None = None) -> Outlook:
+def outlook(place: str, lat: float, lon: float, fetch=None, as_of: str | None = None,
+            cell: tuple[float, float] | None = None) -> Outlook:
+    """`cell` pins the river's grid cell (pilot places do); without it the neighbourhood is scanned."""
     fetch = fetch or _get
-    clat, clon, _ = channel_cell(lat, lon, fetch)
+    clat, clon = cell if cell else channel_cell(lat, lon, fetch)[:2]
     d = fetch({"latitude": clat, "longitude": clon, "daily": "river_discharge,river_discharge_max",
                **window(as_of)})
     days = d["daily"]["time"]

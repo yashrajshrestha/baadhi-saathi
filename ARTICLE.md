@@ -1,87 +1,164 @@
-# Baadhi Saathi (बाढी साथी) — A Flood Advice Agent for Nepal
+# Baadhi Saathi (बाढी साथी): A Flood Friend for Nepali Households, Built with Strands
 
-## The Problem
+## The problem
 
-Nepal loses lives to floods every monsoon. In late 2024, the Bhote Koshi glacier flood and Budhi Gandaki flash flood killed hundreds and destroyed bridges. Official forecasts from GloFAS and DHM exist — they reach experts and newsrooms. They do not reach a family in Arughat as "move the grain upstairs tonight."
+Nepal had two deadly floods in 2026 that no one in the path could see coming: a glacial-lake flood down
+the Bhote Koshi in August, and a flash flood on the Budhi Gandaki on 11 October, when a landslide dam
+upstream gave way. Bridges and homes were lost.
 
-River forecasts are numbers: cubic meters per second, return periods, probability thresholds. A farmer in Gorkha district does not read hydrographs. They need three lines in Nepali telling them what to do today.
+Nepal does have forecasts and warnings. GloFAS forecasts river flow days ahead, DHM runs river gauges, and
+warning texts go out by SMS. But after the August floods, reporters found the texts often came **late**,
+**in Nepali only**, and **without saying what to do or where to go**. Some families by the river got none
+at all. A forecast in cubic meters per second reaches experts and newsrooms. It does not reach a family in
+Arughat as "move the grain upstairs tonight, and if the river suddenly drops, go up to the health post."
 
-That last-mile step — turning forecast data into household advice — is what Baadhi Saathi does.
+That last step, from data to one household's action, is what Baadhi Saathi ("flood friend") does.
 
-## What Baadhi Saathi Does
+## What it does
 
-Baadhi Saathi ("Flood Friend" in Nepali) is a Strands SDK agent that reads river and rain forecasts for one household in Nepal and says, in plain Nepali or English, what to do today.
+Tell it where a household lives and which language they read. It checks five things, then writes today's
+advice in plain Nepali or English, as a short message or three SMS texts:
 
-The agent runs five tools in sequence:
+1. **find_place**: which river matters for this household (three pilot places: Arughat on the Budhi
+   Gandaki, Narayanghat on the Narayani, Chatara on the Koshi).
+2. **upstream_watch**: the floods no forecast can see. Each place lists its known landslide-dam and
+   glacial-lake sources upstream and the warning signs anyone can see (the river suddenly drops, a roar,
+   muddy water, a fast rise). If an upstream gauge reports a surge, the place goes straight to **DANGER**,
+   with an arrival time (river distance ÷ 10–30 km/h).
+3. **river_outlook**: the seven-day river flow from the free Open-Meteo Flood API (GloFAS). The code
+   compares the coming peak with the river's own last 90 days and sets a level: calm, watch, warning or
+   danger. The thresholds are simple multiples, written down so a ward officer can read them.
+4. **rain_outlook**: three-day rain totals, with 60 mm and 120 mm a day as the heavy lines.
+5. **safe_places**: higher ground for that place, in both languages, plus Nepal's emergency numbers
+   (1149 NEOC, 100 police, 102 ambulance).
 
-1. **find_place** — identifies which river matters for the household (three pilot places: Arughat, Narayanghat, Chatara).
-2. **river_outlook** — fetches the seven-day river flow from the free Open-Meteo Flood API (GloFAS data). Compares the coming peak against the river's recent 90-day flow and sets a level: calm, watch, warning, or danger.
-3. **rain_outlook** — pulls three-day rain totals, flagging anything above 60mm/day as heavy.
-4. **upstream_watch** — checks for sudden floods that no forecast can see: landslide dams, glacial lake outbursts, upstream gauge surges. Each pilot place has its known threat sources listed.
-5. **safe_places** — returns higher ground, shelters, and emergency numbers (1149 NEOC, 100 Police, 102 Ambulance).
+Amazon Nova Lite on Amazon Bedrock writes the words. A full answer costs well under one US cent.
 
-The agent then writes advice: short sentences, no jargon, concrete steps for today. The risk level is stamped by code, not the model — so a soothing paragraph can never hide a "danger" warning.
+## Safety lives in code, not in the prompt
 
-## How It's Built with Strands SDK
+My first version put the rules in the system prompt: "check everything", "never make it sound safer", "write
+in Nepali". Then I tested it. In one afternoon, Nova Lite:
 
-Baadhi Saathi uses these Strands SDK features from the workshop:
+- named a **bridge** as a safe place during a flood surge,
+- gave **112** as the emergency number (Nepal's are 1149, 100 and 102),
+- answered a Nepali household **in English**,
+- skipped the rain check, and once
+- called the place lookup **twelve times in a row** with a name it had copied wrong.
 
-**Tools (`@tool` decorator)** — Each data source is a plain Python function decorated with `@tool`. The LLM reads the docstrings to decide when to call them. No manual routing needed.
+A prompt asks. Code decides. So I moved every rule that matters into the Strands agent loop, using what the
+*Building AI Agents with Strands SDK* workshop teaches:
 
-```python
-from strands import Agent, tool
+**A steering handler (Module 3).** `FloodSafetyHandler` runs inside the loop. Before each tool call it
+checks that the place is known, and that the warning signs are fetched in the household's own language
+(they are written by people, so the model copies them instead of translating them badly). After each draft
+answer it checks the draft against what the tools found, in code:
+- every check ran;
+- the draft is in the household's script;
+- nothing reassuring ("don't worry", "खतरा छैन") under a warning;
+- a real safe place is named;
+- only Nepal's emergency numbers;
+- "go now" during a surge.
 
-@tool
-def river_outlook(place_key: str) -> str:
-    """Seven-day river flow forecast for the place."""
-    # Fetches GloFAS data, computes risk level in code
-    ...
+A draft that fails goes back to the model with the reason, at most twice.
+
+**A hook (Module 2).** `ToolBudget` is the workshop's rate limiter, applied here: past 14 tool calls in one
+turn, further calls are refused; past 22, the run is cancelled.
+
+**Code has the last word.** The first line is always the code's level. Under a warning or danger, the lines
+that matter most are written by the code from the tools' data, never by the model:
+- where to go (the real safe places, in Nepali or English);
+- when the water may arrive;
+- who to call.
+
+If the model still fails the checks after its two rewrites, or errors, its words are dropped and the
+household gets the code's message alone. Whatever goes wrong inside the model, a message still goes out,
+and it is correct.
+
+**Session memory (Module 4).** With `--household`, a `FileSessionManager` keeps each family's place,
+language and last level. The next day's message needs no setup, and it says how today compares.
+
+**Evals (Module 7).** `evals/run.py` uses strands-agents-evals. Each case's expected level is computed by the
+code from the same data, so the agent is checked against the data, not against another model's opinion. A
+deterministic `SafetyChecks` evaluator checks the household rules, and an `OutputEvaluator` judge (Nova Pro)
+asks whether the family would know what to do and whether anything is claimed that the data cannot support.
+
+Results on 2 November 2026, six cases, run with two agent models (the judge was Nova Pro both times):
+
+| Case | Expected level | Nova Lite: safety checks / judge | Nova Pro: safety checks / judge |
+|---|---|---|---|
+| Today, Narayanghat, English | CALM | pass / pass | pass / pass |
+| Replay 17 Jul 2026, Chatara, English | WARNING | pass / pass | pass / pass |
+| Replay 11 Jul 2026, Arughat, Nepali | WARNING | pass / pass | pass / pass |
+| Simulated upstream surge, Arughat, Nepali | DANGER now | pass / pass | pass / pass |
+| Simulated upstream surge, Arughat, English SMS | DANGER now | pass / pass | pass / pass |
+| Remembered household, asked with no place or language | WARNING | pass / pass | pass / pass |
+
+Steering sent a draft back once in six cases for Nova Lite (an English draft for a Nepali household) and
+three times for Nova Pro, so the agent stays on the cheaper Nova Lite. The first eval run did not go this
+well: every replay case failed for both models. The free weather archive was returning "503 Service
+Unavailable", and the agent refused to advise without its rain check. Now a missing rain forecast is said
+plainly ("rain forecast unavailable today") and the river and upstream checks still decide the level. The
+full messages are in `evals/results-nova-lite-v1.md` and `evals/results-nova-pro-v1.md`.
+
+## Two kinds of flood, shown honestly
+
+**A flood the forecast can see.** `--as-of` replays a past day with the river and rain recorded since. On
+17 July 2026, three days before the Koshi at Chatara peaked at about 6,000 m³/s (four times its usual
+flow), Baadhi Saathi's level was **WARNING**: pack documents and medicines, move animals and grain, here is
+where to go. At Arughat the Budhi Gandaki shows **WARNING** from 10 July, four days before its 14 July peak.
+This is hindsight with recorded data, not the forecast issued that morning, and the agent says so in its
+answer.
+
+**A flood no forecast can see.** The 11 October flood came from a landslide dam breaking. River and rain
+forecasts can't see that, and this agent says so plainly. What can help is a gauge upstream. A real gauge
+would publish one small MQTT message to AWS IoT Core, and an IoT Rule would hand it to the agent. On a
+laptop, a simulator writes the same message:
+
+```
+python -m saathi.simulate surge chumchet --rise 3.2
+python -m saathi.agent "Arughat" --lang ne --sms
 ```
 
-**System prompt with strict rules** — The agent has guardrails baked into the system prompt: it must call tools in order, never downplay risk, and always include upstream warning signs and safe places.
+Arughat, 60 km downstream, gets **"अहिले खतरा"** (DANGER NOW): go to the health post or the school's upper
+floor, the water may reach you in two to six hours, and call 1149. The time is computed by the code, not
+guessed.
 
-**Risk level enforcement** — The risk level (calm/watch/warning/danger) is computed deterministically in Python, not by the LLM. A `finish()` function stamps the code's level on top of whatever the model writes. This is the same principle as Module 3's steering handlers — deterministic control over the agent's output.
+## What I learned
 
-**Model-agnostic design** — Defaults to Amazon Nova Lite on Bedrock (cheap, fast), but works with any model Strands supports. A `--dry-run` flag skips the model entirely and outputs raw tool data, costing nothing.
+The workshop's progression maps onto safety:
+- tools give the agent facts (Module 1);
+- hooks stop it running away (Module 2);
+- steering holds it to the rules (Module 3);
+- memory makes it personal (Module 4);
+- evals tell you whether any of it works (Module 7).
 
-## Social Impact
+The most useful lesson was negative. The model is very good at words and not trustworthy with facts that
+can hurt someone: a place name, a phone number, a time. So the model writes the explanation, and the code
+owns the facts. I only learned which facts by testing it until it broke.
 
-**Focus area: Climate Resilience**
+The evals also found a bug that was not the model's at all. The river check finds "the river" by scanning
+the forecast grid around a village for the biggest flow. At Arughat that picked a larger river 20 km away,
+not the Budhi Gandaki. Mapping the grid by hand showed the right cell, and every pilot place now pins its
+river cell. A forecast for the wrong river looks just as convincing as one for the right river.
 
-Nepal is one of the most flood-vulnerable countries in the world. The agent targets three pilot communities along major rivers:
+## Honest limits
 
-- **Arughat, Gorkha** — on the Budhi Gandaki, threatened by upstream landslide dams and Manaslu glacial lakes
-- **Narayanghat, Chitwan** — on the Narayani, the confluence of multiple rivers from the Annapurna range
-- **Chatara, Sunsari** — on the Koshi, Nepal's largest river, known for catastrophic floods
+- Three pilot places; the safe places are examples that each ward office would need to confirm.
+- The river levels compare the forecast with the river's own recent history; they are not DHM's official
+  warning and danger lines (DHM's gauge site isn't reachable from outside Nepal).
+- Nova Lite's Nepali is understandable but not polished; the emergency lines are always the code's own Nepali.
+- It supports DHM and ward office alerts. It never replaces them.
 
-Each place has verified safe locations, emergency contacts, and known upstream threat sources. The agent delivers advice in Nepali (बाढी साथी), making it accessible to communities that official forecasts don't reach.
-
-**What makes it different from existing tools:**
-- Existing forecasts are numbers for experts. This agent translates them into household actions.
-- It handles the sudden floods that forecasts miss: landslide dam breaks and glacial lake outbursts, using upstream gauge surge detection.
-- The warning signs section tells people what to watch for with their own eyes — a roaring sound, suddenly muddy water, a rapid rise — so they can act even without connectivity.
-
-## Running It
+## Try it
 
 ```bash
-# Advice in Nepali
-python -m saathi.agent "Arughat" --lang ne
-
-# English, SMS-friendly format
-python -m saathi.agent "Narayanghat" --lang en --sms
-
-# Dry run (no AWS cost, no model call)
-python -m saathi.agent "Chatara" --dry-run
+git clone https://github.com/yashrajshrestha/baadhi-saathi && cd baadhi-saathi
+python3 -m venv .venv && .venv/bin/pip install -e ".[dev,evals]"
+.venv/bin/pytest -q                                              # 35 tests, no AWS needed
+python -m saathi.agent "Chatara" --dry-run                       # the numbers, no model
+AWS_PROFILE=you python -m saathi.agent "Arughat" --lang ne --show-steps
 ```
 
-## What I Learned
-
-Building Baadhi Saathi with the Strands SDK workshop taught me that the hardest part of an agent isn't the LLM — it's the tools. Getting real flood data from Open-Meteo, computing risk levels that a ward officer can verify, and making sure the model never softens a danger warning — that's where the engineering lives.
-
-The workshop's progression from basic tools (Module 1) to hooks and steering (Modules 2-3) directly shaped how I built the risk enforcement. The agent loop handles the complexity of calling five APIs and writing advice; my code handles the safety guarantees.
-
-## Links
-
-- **Repository**: https://github.com/yashrajshrestha/baadhi-saathi
-- **Demo video**: [link to video]
-- **Workshop**: Building AI Agents with Strands SDK: From Simple Loops to Multi-Agent Swarms
+- **Repository**: https://github.com/yashrajshrestha/baadhi-saathi (MIT)
+- **Demo video**: {VIDEO}
+- **Built for**: AWS Builder Center *Strands SDK: Workshop to Ship*, climate resilience track
