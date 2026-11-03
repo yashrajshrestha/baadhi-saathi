@@ -30,3 +30,10 @@ def test_inline_sms_labels_are_stripped():
     msgs = to_sms(advice)
     assert "SMS" not in "".join(msgs)
     assert "नदी सामान्य छ।" in "".join(msgs)
+
+
+def test_trailing_labels_and_repeated_lines_are_dropped():
+    advice = "DANGER NOW: go up\nGo to high ground. (SMS 1/2)\nCall 1149.\nCall 1149.\nPack one bag. (SMS 2/2)"
+    joined = "\n".join(to_sms(advice))
+    assert "SMS" not in joined
+    assert joined.count("Call 1149.") == 1

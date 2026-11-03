@@ -38,15 +38,17 @@ def load_subscribers(path: Path = SUBSCRIBERS) -> dict[str, list[str]]:
 def to_sms(advice: str, limit: int = 300) -> list[str]:
     """Pack the headline and the model's paragraphs into at most MAX_SMS texts."""
     text = re.sub(r"(?im)^[ \t]*(SMS|message|सन्देश)[ \t]*\d[ \t]*/[ \t]*\d[ \t]*:?[ \t]*", "", advice)
+    text = re.sub(r"(?i)[ \t]*\((SMS|message|सन्देश)[ \t]*\d[ \t]*/[ \t]*\d\)", "", text)
     units: list[str] = []
     for line in text.splitlines():
         line = line.strip()
         if not line:
             continue
         if len(line) <= limit:
-            units.append(line)
+            parts = [line]
         else:  # one long paragraph: break at sentence ends (danda or full stop)
-            units.extend(s for s in re.split(r"(?<=[।.!?])\s+", line) if s)
+            parts = [s for s in re.split(r"(?<=[।.!?])\s+", line) if s]
+        units.extend(p for p in parts if p not in units)  # Nova sometimes repeats a line; texts cost money
     msgs: list[str] = []
     for u in units:
         if msgs and len(msgs[-1]) + 1 + len(u) <= limit:
