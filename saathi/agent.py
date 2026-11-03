@@ -101,8 +101,9 @@ Rules:
 - For Nepali, use Nepali forms, not Hindi: "तपाईंको" not "आपका", "सुझाव" not "सलाह", "हुनुहुन्छ" not "हैं",
   "अग्लो" not "ऊँचा", "धमिलो" not "धुँधला", "कागजात" not "दस्तावेज़". Call upstream_watch with the household's
   lang and copy its warning signs as written; name the safe places from safe_places_ne as written.
-- If earlier days for this household are in the conversation, check again anyway (rivers change), then say
-  in one line how today compares with last time, for example "higher than yesterday".
+- If earlier days for this household are in the conversation, check again anyway (rivers change). The code
+  writes how today compares with last time; do not repeat it.
+- Never send people towards the places in never_send_people_towards: that is where sudden floods start.
 - If river_outlook notes a REPLAY, say once that this is a replay of a past day, not today's forecast.
 """
 
@@ -236,7 +237,35 @@ def finish(model_text: str, level: str, lang: str, surge: bool = False, action: 
     # Nova sometimes repeats a paragraph word for word; on a phone that is a wasted SMS.
     paragraphs = list(dict.fromkeys(p.strip() for p in re.split(r"\n\s*\n", body) if p.strip()))
     body = "\n\n".join(paragraphs)
+    seen_lines, kept = set(), []
+    for line in body.split("\n"):   # and sometimes one line, inside different paragraphs
+        key = line.strip().lstrip("-• ").strip()
+        if key and key in seen_lines:
+            continue
+        seen_lines.add(key)
+        kept.append(line)
+    body = re.sub(r"\n{3,}", "\n\n", "\n".join(kept)).strip()
     return head if not body else f"{head}\n\n{body}"
+
+
+COMPARE_WORDS = {
+    "en": {"line": "Last check {date}: {before}. Today: {now}, {how}.",
+           "higher": "higher", "lower": "lower", "same": "the same"},
+    "ne": {"line": "पछिल्लो जाँच {date}: {before}। आज: {now}, {how}।",
+           "higher": "बढेको", "lower": "घटेको", "same": "उस्तै"},
+}
+
+
+def compare_line(last: dict | None, level: str, lang: str) -> str:
+    """How today compares with this household's last check, written by the code from saved state (a model
+    asked to say this once simply left it out)."""
+    if not last or last.get("level") not in LEVELS or level not in LEVELS:
+        return ""
+    w = COMPARE_WORDS.get(lang, COMPARE_WORDS["en"])
+    a, b = LEVELS.index(last["level"]), LEVELS.index(level)
+    how = w["higher"] if b > a else w["lower"] if b < a else w["same"]
+    name = lambda l: LEVEL_WORDS[l]["ne" if lang == "ne" else "en"].split(":")[0]
+    return w["line"].format(date=last.get("date", "?"), before=name(last["level"]), now=name(level), how=how)
 
 
 def as_of() -> str | None:
@@ -310,10 +339,12 @@ def advise(place: str | None = None, lang: str | None = None, sms: bool = False,
         seen, body = code_picture(place, lang), ""
     elif problem(body, seen, lang):
         body = ""   # still failing after the rewrites steering allowed: send the code's message only
+    compared = compare_line(last, seen["level"], lang)
     agent.state.set("last", {"date": as_of() or date.today().isoformat(), "level": seen["level"]})
     if getattr(agent, "saathi_session", None):
         agent.saathi_session.sync_agent(agent)   # state set after the last message is not saved otherwise
-    return finish(body, seen["level"], lang, seen["surge"], action_block(seen, lang))
+    action = "\n".join(x for x in (compared, action_block(seen, lang)) if x)
+    return finish(body, seen["level"], lang, seen["surge"], action)
 
 
 def code_picture(place: str, lang: str) -> dict:
@@ -323,7 +354,8 @@ def code_picture(place: str, lang: str) -> dict:
     river = rivers.summary(rivers.outlook(p["name"], p["lat"], p["lon"], as_of=as_of(), cell=p.get("river_cell")))
     return {"ok": set(REQUIRED), "level": "danger" if up["alerts"] else river["level"], "surge": bool(up["alerts"]),
             "alerts": up["alerts"], "safe": p["safe_places"] + p.get("safe_places_ne", []),
-            "safe_en": p["safe_places"], "safe_ne": p.get("safe_places_ne", []), "landmarks": p.get("landmarks", [])}
+            "safe_en": p["safe_places"], "safe_ne": p.get("safe_places_ne", []), "landmarks": p.get("landmarks", []),
+            "sources": up.get("source_words", [])}
 
 
 def main() -> None:

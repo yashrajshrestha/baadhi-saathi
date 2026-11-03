@@ -86,6 +86,9 @@ def watch(place_key: str, lang: str = "en", now: datetime | None = None, alert_d
         "level": "danger" if alerts else None,   # None: no say; the river forecast decides
         "alerts": alerts,
         "sudden_flood_sources": [s["name"] for s in sources.values()],
+        # where floods start: a safe place is never towards these (a model once sent Arughat to Chumchet)
+        "never_send_people_towards": [s["name"] for s in sources.values()],
+        "source_words": sorted({w for s in sources.values() for w in s.get("words", [])}),
         "warning_signs": places.WARNING_SIGNS[lang],
         "act_on_signs": places.ACT_ON_SIGNS[lang],
         "limits": "Upstream gauges catch a surge only after it starts. Lead time is the travel time, minutes to hours.",

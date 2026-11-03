@@ -44,6 +44,8 @@ CALMING = (
     "चिन्ता नगर्नुहोस्", "खतरा छैन", "जोखिम छैन", "बाढी आउँदैन", "डराउनु पर्दैन",
 )
 GO_WORDS = ("high ground", "higher ground", "upper floor", "अग्लो", "माथिल्लो", "उच्च", "सुरक्षित ठाउँ")
+# "go there" words; a flood source named after one of these, in the same sentence, is a place to send people
+TOWARD_WORDS = GO_WORDS + ("go to", "move to", "head to", "towards", "toward", "जानुहोस्", "सर्नुहोस्", "तिर जानु")
 NOW_WORDS = ("now", "immediately", "at once", "अहिले", "तुरुन्त", "यसै क्षण", "यही बेला", "छिटो")
 
 
@@ -85,7 +87,7 @@ def tool_results(messages: list[dict]) -> list[tuple[str, str, Any]]:
 
 def picture(messages: list[dict]) -> dict:
     """What the tools said in these messages: which succeeded, the worst level, live alerts, safe places."""
-    ok, levels, alerts, safe, safe_ne, landmarks = set(), [], [], [], [], []
+    ok, levels, alerts, safe, safe_ne, landmarks, sources = set(), [], [], [], [], [], []
     for name, status, data in tool_results(messages):
         if status != "success" or not isinstance(data, dict) or "error" in data:
             continue
@@ -96,10 +98,12 @@ def picture(messages: list[dict]) -> dict:
         safe += data.get("safe_places", [])
         safe_ne += data.get("safe_places_ne", [])
         landmarks += data.get("landmarks", [])
+        sources += data.get("source_words", [])
     surge = bool(alerts)
     level = "danger" if surge else max(levels, key=LEVELS.index) if levels else "calm"
     return {"ok": ok, "level": level, "surge": surge, "alerts": alerts, "safe": safe + safe_ne,
-            "safe_en": safe, "safe_ne": safe_ne, "landmarks": landmarks}
+            "safe_en": safe, "safe_ne": safe_ne, "landmarks": landmarks,
+            "sources": sources}
 
 
 def text_of(message: dict) -> str:
@@ -120,6 +124,26 @@ def wrong_numbers(draft: str) -> list[str]:
     return [n for n in found if n not in EMERGENCY_NUMBERS]
 
 
+def towards_source(draft: str, words) -> str | None:
+    """A flood source (landslide dam, glacial lake) the draft sends people towards, else None. During a test
+    surge Nova Lite wrote "go to high ground: Chumchet / Tsum valley", the very place the flood came from.
+    "The flood comes from Chumchet, go up now" is fine: the source is before the go-word, or marked "from"."""
+    for sentence in re.split(r"[.!?।\n]+", draft.lower()):
+        starts = [sentence.find(w) for w in TOWARD_WORDS if w in sentence]
+        if not starts:
+            continue
+        go = min(starts)
+        for w in words:
+            i = sentence.find(w.lower(), go)
+            while i != -1:
+                tail, head = sentence[i + len(w):i + len(w) + 20], sentence[max(0, i - 12):i]
+                came_from = re.match(r"^\S*(\s\S*)?(बाट|देखि)", tail) or re.search(r"\bfrom( the)?\s*$", head)
+                if not came_from:
+                    return w
+                i = sentence.find(w.lower(), i + 1)
+    return None
+
+
 def problem(draft: str, seen: dict, lang: str | None = None) -> str | None:
     """Why this draft may not go to the household, or None if it may."""
     missing = missing_checks(seen)
@@ -130,6 +154,10 @@ def problem(draft: str, seen: dict, lang: str | None = None) -> str | None:
     if bad:
         return (f"{bad[0]} is not a Nepal emergency number. Use only the numbers from safe_places: "
                 "1149 (NEOC, disaster), 100 (police), 102 (ambulance).")
+    source = towards_source(draft, seen.get("sources", []))
+    if source:
+        return (f"Never send people towards \"{source}\": that is upstream, where the flood starts. Name only the safe "
+                "places from safe_places (safe_places_ne in Nepali).")
     if lang == "ne" and devanagari_share(draft) < 0.6:
         return ("This household reads Nepali. Rewrite the whole advice in Nepali (Devanagari script), "
                 "short sentences, using safe_places_ne for the safe places.")

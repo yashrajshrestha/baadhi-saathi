@@ -58,3 +58,18 @@ def test_under_a_warning_the_code_says_where_to_go_when_and_who_to_call():
 def test_sms_labels_are_removed_even_inside_a_line():
     out = agent.finish("पानी बढ्यो। SMS 2/3: अग्लो ठाउँमा जानुहोस्।", "watch", "ne")
     assert "SMS" not in out and "अग्लो ठाउँमा जानुहोस्।" in out
+
+
+def test_finish_drops_a_line_repeated_inside_different_paragraphs():
+    out = agent.finish("Go to the school now.\nWater comes 01:00-05:00.\n\nPack a bag.\nWater comes 01:00-05:00.",
+                       "danger", "en", surge=True)
+    assert out.count("Water comes 01:00-05:00.") == 1 and "Pack a bag." in out
+
+
+def test_the_code_says_how_today_compares_with_last_time():
+    assert agent.compare_line(None, "calm", "en") == ""
+    assert agent.compare_line({"date": "2026-11-01", "level": "calm"}, "warning", "en") == \
+        "Last check 2026-11-01: CALM. Today: WARNING, higher."
+    assert agent.compare_line({"date": "2026-11-01", "level": "warning"}, "calm", "ne") == \
+        "पछिल्लो जाँच 2026-11-01: चेतावनी। आज: शान्त, घटेको।"
+    assert agent.compare_line({"date": "2026-11-01", "level": "calm"}, "calm", "ne").endswith("उस्तै।")

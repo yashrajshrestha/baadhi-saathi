@@ -55,10 +55,10 @@ workshop, applied to a flood:
 
 | Layer | Strands feature | What it enforces |
 |---|---|---|
-| `FloodSafetyHandler` (`saathi/steering.py`) | steering handler (`steer_before_tool`, `steer_after_model`) | no tool before the place is known; warning signs fetched in the household's language, not translated; no answer until every check has run; a draft in the wrong script, with reassurance under a warning, without a named safe place, with a wrong emergency number, or without "go now" in a surge is sent back to be rewritten (at most twice) |
+| `FloodSafetyHandler` (`saathi/steering.py`) | steering handler (`steer_before_tool`, `steer_after_model`) | no tool before the place is known; warning signs fetched in the household's language, not translated; no answer until every check has run; a draft in the wrong script, with reassurance under a warning, without a named safe place, with a wrong emergency number, without "go now" in a surge, or sending people towards an upstream flood source is sent back to be rewritten (at most twice) |
 | `ToolBudget` | hook (`BeforeToolCallEvent`) | a runaway tool loop is cut off: past 14 calls in a turn tools are refused, past 22 the run is cancelled |
 | `finish()` + `action_block()` | plain code after the loop | the level line is the code's, on top; under warning or danger, *where to go, when the water comes and who to call* are written by the code from the tools' data; if the model still fails the checks, or errors, its words are dropped and the household gets the code's message |
-| `--household` | `FileSessionManager` | remembers each household's place, language and last level, so tomorrow's message needs no setup and says how today compares |
+| `--household` | `FileSessionManager` | remembers each household's place, language and last level, so tomorrow's message needs no setup; the code writes how today compares |
 
 Why so strict: in testing, Nova Lite once named a **bridge** as a safe place during a surge, gave **112**
 (not a Nepal number), answered a Nepali household in English, and skipped the rain check. Every one of
@@ -103,7 +103,7 @@ AWS_PROFILE=personal python -m evals.run          # 6 cases; results in evals/re
 
 ```
 python3 -m venv .venv && .venv/bin/pip install -e ".[dev,evals]"
-.venv/bin/pytest -q                      # 36 tests, no network, no AWS
+.venv/bin/pytest -q                      # 39 tests, no network, no AWS
 AWS_PROFILE=personal .venv/bin/python -m saathi.agent "Arughat" --lang ne
 ```
 

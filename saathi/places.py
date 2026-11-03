@@ -23,8 +23,8 @@ PLACES = {
         # Upstream sources of sudden floods that no rain or river forecast can see. Distances are
         # approximate river kilometres, to be checked with DHM before any real use.
         "upstream": [
-            {"id": "chumchet", "name": "Chumchet / Tsum valley (landslide dams)", "kind": "landslide_dam", "km": 60},
-            {"id": "manaslu-glacial", "name": "Manaslu headwaters near the Tibet border (glacial lakes)", "kind": "glacial_lake", "km": 90},
+            {"id": "chumchet", "name": "Chumchet / Tsum valley (landslide dams)", "kind": "landslide_dam", "km": 60, "words": ["chumchet", "tsum", "चुम्चेट", "छुम्चेत", "त्सुम"]},
+            {"id": "manaslu-glacial", "name": "Manaslu headwaters near the Tibet border (glacial lakes)", "kind": "glacial_lake", "km": 90, "words": ["manaslu", "tibet", "मनास्लु", "तिब्बत"]},
         ],
     },
     "narayanghat": {
@@ -36,8 +36,8 @@ PLACES = {
         "landmarks": ["hospital", "ward office", "school", "अस्पताल", "वडा कार्यालय", "विद्यालय"],
         "context": "Low-lying settlements by the Narayani flood in most monsoons; the river rises over hours, not minutes.",
         "upstream": [
-            {"id": "budhi-gandaki", "name": "Budhi Gandaki (landslide dams, glacial lakes), via Trishuli", "kind": "landslide_dam", "km": 140},
-            {"id": "kali-gandaki", "name": "Kali Gandaki headwaters (landslide dams)", "kind": "landslide_dam", "km": 220},
+            {"id": "budhi-gandaki", "name": "Budhi Gandaki (landslide dams, glacial lakes), via Trishuli", "kind": "landslide_dam", "km": 140, "words": ["budhi gandaki", "बूढीगण्डकी", "बुढीगण्डकी", "बूढी गण्डकी", "बुढी गण्डकी"]},
+            {"id": "kali-gandaki", "name": "Kali Gandaki headwaters (landslide dams)", "kind": "landslide_dam", "km": 220, "words": ["kali gandaki", "कालीगण्डकी", "काली गण्डकी"]},
         ],
     },
     "chatara": {
@@ -49,8 +49,8 @@ PLACES = {
         "landmarks": ["embankment", "barahakshetra", "school", "temple", "तटबन्ध", "वराहक्षेत्र", "विद्यालय", "मन्दिर"],
         "context": "Koshi barrage area; embankment breaches in 2008 displaced tens of thousands.",
         "upstream": [
-            {"id": "bhote-koshi", "name": "Bhote Koshi / Sun Koshi from Tibet (glacial lakes)", "kind": "glacial_lake", "km": 250},
-            {"id": "arun", "name": "Arun from Tibet (glacial lakes, landslide dams)", "kind": "glacial_lake", "km": 180},
+            {"id": "bhote-koshi", "name": "Bhote Koshi / Sun Koshi from Tibet (glacial lakes)", "kind": "glacial_lake", "km": 250, "words": ["bhote koshi", "sun koshi", "tibet", "भोटेकोशी", "भोटे कोशी", "सुनकोशी", "सुन कोशी", "तिब्बत"]},
+            {"id": "arun", "name": "Arun from Tibet (glacial lakes, landslide dams)", "kind": "glacial_lake", "km": 180, "words": ["arun", "tibet", "अरुण", "तिब्बत"]},
         ],
     },
 }

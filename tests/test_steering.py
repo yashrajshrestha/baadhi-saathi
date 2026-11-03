@@ -151,3 +151,18 @@ def test_a_runaway_loop_is_cut_off():
     fine = Ev(FakeAgent(full_check()))
     budget.before(fine)
     assert fine.cancel_tool is False
+
+
+def test_never_send_people_towards_the_flood_source():
+    # a real Nova Lite draft during a simulated Chumchet surge sent Arughat towards Chumchet itself
+    msgs = full_check("calm", alerts=[{"station": "Chumchet"}])
+    msgs += [call("upstream_watch", 20), result(20, {"level": "danger", "alerts": [{"station": "Chumchet"}],
+                                                     "source_words": ["chumchet", "tsum", "चुम्चेट", "त्सुम"]})]
+    seen = steering.picture(msgs)
+    assert "Never send people towards" in steering.problem(
+        "अहिले विद्यालय जानुहोस्। अग्लो ठाउँमा जानुहोस्: चुम्चेट / त्सुम् उपत्यका।", seen, "ne")
+    assert "Never send people towards" in steering.problem("Go now to higher ground towards Tsum valley.", seen, "en")
+    # naming the source as where the flood comes from is fine
+    assert steering.problem("चुम्चेटबाट बाढी आउँदैछ। तुरुन्तै विद्यालय जानुहोस्।", seen, "ne") is None
+    assert steering.problem("A surge from Chumchet is coming. Go to the school now.", seen, "en") is None
+    assert steering.problem("Go to the school now, the surge is coming from the Chumchet side.", seen, "en") is None

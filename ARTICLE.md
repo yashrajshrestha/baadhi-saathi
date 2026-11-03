@@ -57,7 +57,8 @@ answer it checks the draft against what the tools found, in code:
 - nothing reassuring ("don't worry", "खतरा छैन") under a warning;
 - a real safe place is named;
 - only Nepal's emergency numbers;
-- "go now" during a surge.
+- "go now" during a surge;
+- never send people towards a flood source upstream.
 
 A draft that fails goes back to the model with the reason, at most twice.
 
@@ -75,14 +76,16 @@ household gets the code's message alone. Whatever goes wrong inside the model, a
 and it is correct.
 
 **Session memory (Module 4).** With `--household`, a `FileSessionManager` keeps each family's place,
-language and last level. The next day's message needs no setup, and it says how today compares.
+language and last level. The next visit needs no place and no language. The comparison line is written by
+the code from the saved level ("Last check 15 June: WATCH. Today: DANGER, higher."): asked to write it,
+the model simply left it out.
 
 **Evals (Module 7).** `evals/run.py` uses strands-agents-evals. Each case's expected level is computed by the
 code from the same data, so the agent is checked against the data, not against another model's opinion. A
 deterministic `SafetyChecks` evaluator checks the household rules, and an `OutputEvaluator` judge (Nova Pro)
 asks whether the family would know what to do and whether anything is claimed that the data cannot support.
 
-Results on 2 November 2026, six cases, run with two agent models (the judge was Nova Pro both times):
+Results on 2 and 3 November 2026, six cases, run with two agent models (the judge was Nova Pro both times):
 
 | Case | Expected level | Nova Lite: safety checks / judge | Nova Pro: safety checks / judge |
 |---|---|---|---|
@@ -93,8 +96,10 @@ Results on 2 November 2026, six cases, run with two agent models (the judge was 
 | Simulated upstream surge, Arughat, English SMS | DANGER now | pass / pass | pass / pass |
 | Remembered household, asked with no place or language | WARNING | pass / pass | pass / pass |
 
-Steering sent a draft back once in six cases for Nova Lite (an English draft for a Nepali household) and
-three times for Nova Pro, so the agent stays on the cheaper Nova Lite. The first eval run did not go this
+Steering sent drafts back five times, in three of the six cases, for Nova Lite and once for Nova Pro. Both
+end up passing, so the agent stays on Nova Lite, which costs several times less: the steering absorbs its
+mistakes. One earlier Nova Pro run stopped before its checks in the Nepali surge case; the code dropped its
+words and sent its own danger message, which is the design working, though the eval counts it as a fail. The first eval run did not go this
 well: every replay case failed for both models. The free weather archive was returning "503 Service
 Unavailable", and the agent refused to advise without its rain check. Now a missing rain forecast is said
 plainly ("rain forecast unavailable today") and the river and upstream checks still decide the level. The
@@ -141,6 +146,13 @@ the forecast grid around a village for the biggest flow. At Arughat that picked 
 not the Budhi Gandaki. Mapping the grid by hand showed the right cell, and every pilot place now pins its
 river cell. A forecast for the wrong river looks just as convincing as one for the right river.
 
+**Caught while making the demo video.** During a simulated Chumchet surge, Nova Lite wrote to Arughat
+"अग्लो ठाउँमा जानुहोस्: चुम्चेट / त्सुम् उपत्यका" ("go to high ground: Chumchet / Tsum valley"), the very
+place the flood starts. None of the checks caught it, because they only asked whether a real safe place
+was named, not whether a dangerous one was. Each upstream source now carries its names in both scripts,
+and steering refuses a draft that sends people towards one ("the flood comes from Chumchet, go to the
+school now" still passes). It has a test, like every other rule.
+
 ## Honest limits
 
 - Three pilot places; the safe places are examples that each ward office would need to confirm.
@@ -154,7 +166,7 @@ river cell. A forecast for the wrong river looks just as convincing as one for t
 ```bash
 git clone https://github.com/yashrajshrestha/baadhi-saathi && cd baadhi-saathi
 python3 -m venv .venv && .venv/bin/pip install -e ".[dev,evals]"
-.venv/bin/pytest -q                                              # 36 tests, no AWS needed
+.venv/bin/pytest -q                                              # 39 tests, no AWS needed
 python -m saathi.agent "Chatara" --dry-run                       # the numbers, no model
 AWS_PROFILE=you python -m saathi.agent "Arughat" --lang ne --show-steps
 ```
