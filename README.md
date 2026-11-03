@@ -8,7 +8,7 @@ the Budhi Gandaki flash flood of 11 October. Official data exists: GloFAS river 
 DHM river gauges with warning and danger lines. It reaches experts and newsrooms. It does not reach a
 family in Arughat as "move the grain upstairs tonight". That last step is what this agent does.
 
-**Demo video:** https://yashrajshrestha.github.io/baadhi-saathi/
+**Demo video (2:50):** https://youtu.be/lqhkSsZgAts
 
 ## What it does
 

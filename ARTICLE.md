@@ -196,5 +196,5 @@ AWS_PROFILE=you python -m saathi.agent "Arughat" --lang ne --show-steps
 ```
 
 - **Repository**: https://github.com/yashrajshrestha/baadhi-saathi (MIT)
-- **Demo video**: {VIDEO}
+- **Demo video**: https://youtu.be/lqhkSsZgAts (2:50)
 - **Built for**: AWS Builder Center *Strands SDK: Workshop to Ship*, climate resilience track
