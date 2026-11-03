@@ -34,6 +34,27 @@ advice in plain Nepali or English, as a short message or three SMS texts:
 
 Amazon Nova Lite on Amazon Bedrock writes the words. A full answer costs well under one US cent.
 
+### How the message reaches people
+
+Nobody types a command into a terminal during a flash flood. The delivery code (`saathi/push.py`) and its
+Lambda handler are built and tested; the schedule and IoT wiring below are the deployment design, not yet
+running in AWS.
+
+- **Every morning at 06:00 Nepal time**, a schedule runs the agent for each place and texts every subscribed
+  number through Amazon SNS, at most three texts. SMS works on any phone, including basic ones without data.
+- **When an upstream gauge sees a surge**, it publishes one small MQTT message to AWS IoT Core. An IoT rule
+  calls the same Lambda, the place jumps straight to DANGER, and "go to high ground now" goes out at once,
+  without waiting for the morning.
+
+```
+06:00 schedule ─────────────┐
+                            ├─► Lambda ─► Strands agent ─► Amazon SNS ─► SMS to each household
+gauge ─MQTT─► AWS IoT Core ─┘
+```
+
+Before texting, the code strips "SMS 1/3" labels the model adds and drops repeated lines: on a basic phone
+every text costs money.
+
 ## Safety lives in code, not in the prompt
 
 My first version put the rules in the system prompt: "check everything", "never make it sound safer", "write
@@ -159,6 +180,8 @@ school now" still passes). It has a test, like every other rule.
 - The river levels compare the forecast with the river's own recent history; they are not DHM's official
   warning and danger lines (DHM's gauge site isn't reachable from outside Nepal).
 - Nova Lite's Nepali is understandable but not polished; the emergency lines are always the code's own Nepali.
+- The 06:00 schedule and the IoT trigger are designed, not yet deployed; `python -m saathi.push --no-send`
+  shows the texts each subscriber would get.
 - It supports DHM and ward office alerts. It never replaces them.
 
 ## Try it
@@ -166,8 +189,9 @@ school now" still passes). It has a test, like every other rule.
 ```bash
 git clone https://github.com/yashrajshrestha/baadhi-saathi && cd baadhi-saathi
 python3 -m venv .venv && .venv/bin/pip install -e ".[dev,evals]"
-.venv/bin/pytest -q                                              # 39 tests, no AWS needed
+.venv/bin/pytest -q                                              # 41 tests, no AWS needed
 python -m saathi.agent "Chatara" --dry-run                       # the numbers, no model
+python -m saathi.push --no-send                                  # the SMS each subscriber would get
 AWS_PROFILE=you python -m saathi.agent "Arughat" --lang ne --show-steps
 ```
 
