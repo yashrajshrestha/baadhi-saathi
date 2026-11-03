@@ -37,7 +37,7 @@ def load_subscribers(path: Path = SUBSCRIBERS) -> dict[str, list[str]]:
 
 def to_sms(advice: str, limit: int = 300) -> list[str]:
     """Pack the headline and the model's paragraphs into at most MAX_SMS texts."""
-    text = re.sub(r"(?im)^\s*(SMS|message|सन्देश)\s*\d\s*/\s*\d\s*:?\s*$", "", advice)
+    text = re.sub(r"(?im)^[ \t]*(SMS|message|सन्देश)[ \t]*\d[ \t]*/[ \t]*\d[ \t]*:?[ \t]*", "", advice)
     units: list[str] = []
     for line in text.splitlines():
         line = line.strip()

@@ -23,3 +23,10 @@ def test_single_newline_wall_of_text_is_still_split():
 
 def test_headline_alone_is_one_message():
     assert to_sms(HEAD) == [HEAD]
+
+
+def test_inline_sms_labels_are_stripped():
+    advice = HEAD + "\nSMS 1/3: नदी सामान्य छ।\nSMS 2/3: झोला तयार राख्नुहोस्।"
+    msgs = to_sms(advice)
+    assert "SMS" not in "".join(msgs)
+    assert "नदी सामान्य छ।" in "".join(msgs)
