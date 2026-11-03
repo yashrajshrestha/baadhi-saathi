@@ -55,6 +55,18 @@ gauge ─MQTT─► AWS IoT Core ─┘
 Before texting, the code strips "SMS 1/3" labels the model adds and drops repeated lines: on a basic phone
 every text costs money.
 
+## Who it is for
+
+- **Arughat, Gorkha**, on the Budhi Gandaki: landslide dams in the Tsum valley and glacial lakes below
+  Manaslu upstream. The 11 October 2026 flash flood came down this river.
+- **Narayanghat, Chitwan**, on the Narayani, where rivers from the Annapurna and Manaslu ranges meet.
+- **Chatara, Sunsari**, on the Koshi, Nepal's largest river.
+
+Families by these rivers often have a basic phone, read Nepali, and get official warnings late or not at
+all. Forecasts exist; household advice does not. This turns one into the other, and it also covers what
+forecasts miss: upstream surges, and the warning signs people can see with their own eyes, so they can act
+even when the network is down.
+
 ## Safety lives in code, not in the prompt
 
 My first version put the rules in the system prompt: "check everything", "never make it sound safer", "write
