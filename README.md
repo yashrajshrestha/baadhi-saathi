@@ -19,6 +19,10 @@ python -m saathi.agent "Chatara" --dry-run            # the numbers only, no mod
 python -m saathi.push --no-send                       # today's SMS for every subscribed phone
 ```
 
+**Tested on a real phone:** on 5 Nov 2026, `python -m saathi.push --place arughat` sent Arughat's advice as
+three SMS through Amazon SNS to a verified Nepal (+977) number, and they arrived. The account is still in the
+SNS SMS sandbox, so only verified numbers receive texts until it is moved out.
+
 1. `find_place` — which river matters for this household (three pilot places for now).
 2. `river_outlook` — seven-day river flow from the free Open-Meteo Flood API (GloFAS). The code finds
    the river cell (the nearest grid cell is usually a side-stream), compares the coming peak with the

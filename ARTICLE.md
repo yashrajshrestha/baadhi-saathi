@@ -37,8 +37,10 @@ Amazon Nova Lite on Amazon Bedrock writes the words. A full answer costs well un
 ### How the message reaches people
 
 Nobody types a command into a terminal during a flash flood. The delivery code (`saathi/push.py`) and its
-Lambda handler are built and tested; the schedule and IoT wiring below are the deployment design, not yet
-running in AWS.
+Lambda handler are built and tested, and on 5 November 2026 a real run sent Arughat's advice as three SMS
+through Amazon SNS to a verified phone in Nepal (+977), and they arrived. The account is still in the SNS SMS
+sandbox, so only verified numbers receive texts for now. The schedule and IoT wiring below are the deployment
+design, not yet running in AWS.
 
 - **Every morning at 06:00 Nepal time**, a schedule runs the agent for each place and texts every subscribed
   number through Amazon SNS, at most three texts. SMS works on any phone, including basic ones without data.
